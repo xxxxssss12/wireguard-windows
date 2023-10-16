@@ -33,9 +33,11 @@ type (
 )
 
 type Config struct {
-	Name      string
-	Interface Interface
-	Peers     []Peer
+	Name         string
+	DnsServer    string
+	Ipv6Priority bool
+	Interface    Interface
+	Peers        []Peer
 }
 
 type Interface struct {

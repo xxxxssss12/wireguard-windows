@@ -18,6 +18,8 @@ import (
 
 func (conf *Config) ToWgQuick() string {
 	var output strings.Builder
+	output.WriteString(fmt.Sprintf("#DnsServer=%s\n", conf.DnsServer))
+	output.WriteString(fmt.Sprintf("#Ipv6Priority=%t\n", conf.Ipv6Priority))
 	output.WriteString("[Interface]\n")
 
 	output.WriteString(fmt.Sprintf("PrivateKey = %s\n", conf.Interface.PrivateKey.String()))

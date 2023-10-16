@@ -16,7 +16,9 @@ import (
 )
 
 type Tunnel struct {
-	Name string
+	Name         string
+	DnsServer    string
+	Ipv6Priority bool
 }
 
 type TunnelState int
@@ -133,7 +135,7 @@ func InitializeIPCClient(reader, writer, events *os.File) {
 				if state == TunnelUnknown {
 					continue
 				}
-				t := &Tunnel{tunnel}
+				t := &Tunnel{tunnel, "", false}
 				for cb := range tunnelChangeCallbacks {
 					cb.cb(t, state, globalState, retErr)
 				}

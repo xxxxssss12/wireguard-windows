@@ -205,7 +205,7 @@ func (s *ManagerService) Create(tunnelConfig *conf.Config) (*Tunnel, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tunnel{tunnelConfig.Name}, nil
+	return &Tunnel{tunnelConfig.Name, tunnelConfig.DnsServer, tunnelConfig.Ipv6Priority}, nil
 	// TODO: handle already existing situation
 	// TODO: handle already running and existing situation
 }

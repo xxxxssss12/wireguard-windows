@@ -6,17 +6,15 @@
 package ui
 
 import (
-	"net/netip"
-	"strings"
-
 	"github.com/lxn/walk"
 	"github.com/lxn/win"
 	"golang.org/x/sys/windows"
-
 	"golang.zx2c4.com/wireguard/windows/conf"
 	"golang.zx2c4.com/wireguard/windows/l18n"
 	"golang.zx2c4.com/wireguard/windows/manager"
 	"golang.zx2c4.com/wireguard/windows/ui/syntax"
+	"net/netip"
+	"strings"
 )
 
 type EditDialog struct {

@@ -6,18 +6,17 @@
 package conf
 
 import (
+	"github.com/miekg/dns"
+	"golang.org/x/sys/windows"
+	"golang.zx2c4.com/wireguard/windows/services"
+	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
 	"log"
 	"net/netip"
 	"time"
 	"unsafe"
-
-	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
-
-	"golang.org/x/sys/windows"
-	"golang.zx2c4.com/wireguard/windows/services"
 )
 
-func resolveHostname(name string) (resolvedIPString string, err error) {
+func resolveHostname(name string, dnsServer string, ipv6Priority bool) (resolvedIPString string, err error) {
 	maxTries := 10
 	if services.StartedAtBoot() {
 		maxTries *= 3
@@ -26,7 +25,7 @@ func resolveHostname(name string) (resolvedIPString string, err error) {
 		if i > 0 {
 			time.Sleep(time.Second * 4)
 		}
-		resolvedIPString, err = resolveHostnameOnce(name)
+		resolvedIPString, err = resolveHostnameOnce(name, dnsServer, ipv6Priority)
 		if err == nil {
 			return
 		}
@@ -43,7 +42,59 @@ func resolveHostname(name string) (resolvedIPString string, err error) {
 	return
 }
 
-func resolveHostnameOnce(name string) (resolvedIPString string, err error) {
+func resolveHostnameOnce(name string, dnsServer string, ipv6Priority bool) (resolvedIPString string, err error) {
+	// use miekg.dns
+	log.Printf("dns resolve: domain=%s, dnsServer= %s, ipv6Priority= %t", name, dnsServer, ipv6Priority)
+
+	if dnsServer != "" {
+		log.Printf("miekg.dns resolve ipv6 address: %s", dnsServer)
+
+		c := new(dns.Client)
+		m := new(dns.Msg)
+		m.SetQuestion(dns.Fqdn(name), dns.TypeAAAA)
+		ipv6, _, err := c.Exchange(m, dnsServer)
+		ipv6Addr := ""
+		haveIpv6 := false
+		if err == nil && len(ipv6.Answer) > 0 {
+			for _, ans := range ipv6.Answer {
+				if aaaa, ok := ans.(*dns.AAAA); ok {
+					haveIpv6 = true
+					ipv6Addr = aaaa.AAAA.String()
+					log.Printf("miekg.dns resolve ipv6 address: %s", ipv6Addr)
+					break
+				}
+			}
+		} else if err != nil {
+			log.Printf("miekg.dns get ipv6 err: %s", err)
+		}
+		m = new(dns.Msg)
+		m.SetQuestion(dns.Fqdn(name), dns.TypeA)
+		ipv4, _, err := c.Exchange(m, dnsServer)
+		ipv4Addr := ""
+		haveIpv4 := false
+		if err == nil && len(ipv4.Answer) > 0 {
+			for _, ans := range ipv4.Answer {
+				if a, ok := ans.(*dns.A); ok {
+					haveIpv4 = true
+					ipv4Addr = a.A.String()
+					log.Printf("miekg.dns resolve ipv4 address: %s", ipv6Addr)
+					break
+				}
+			}
+		} else if err != nil {
+			log.Printf("miekg.dns get ipv6 err: %s", err)
+		}
+		if ipv6Priority && haveIpv6 {
+			return ipv6Addr, err
+		} else if haveIpv4 {
+			return ipv4Addr, err
+		} else if haveIpv6 {
+			return ipv6Addr, err
+		} else {
+			log.Printf("miekg.dns don't get result")
+		}
+	}
+
 	hints := windows.AddrinfoW{
 		Family:   windows.AF_UNSPEC,
 		Socktype: windows.SOCK_DGRAM,
@@ -88,7 +139,8 @@ func (config *Config) ResolveEndpoints() error {
 			continue
 		}
 		var err error
-		config.Peers[i].Endpoint.Host, err = resolveHostname(config.Peers[i].Endpoint.Host)
+		config.Peers[i].Endpoint.Host, err = resolveHostname(config.Peers[i].Endpoint.Host,
+			config.DnsServer, config.Ipv6Priority)
 		if err != nil {
 			return err
 		}

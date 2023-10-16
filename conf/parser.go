@@ -166,11 +166,24 @@ func FromWgQuick(s, name string) (*Config, error) {
 	conf := Config{Name: name}
 	sawPrivateKey := false
 	var peer *Peer
-	for _, line := range lines {
-		line, _, _ = strings.Cut(line, "#")
+	for _, lineOri := range lines {
+		line, _, _ := strings.Cut(lineOri, "#")
 		line = strings.TrimSpace(line)
 		lineLower := strings.ToLower(line)
 		if len(line) == 0 {
+			if strings.IndexByte(lineOri, '#') < 0 {
+				continue
+			}
+			tmp := lineOri[1:]
+			equals := strings.IndexByte(tmp, '=')
+			if strings.HasPrefix(lineOri, "#DnsServer") && equals > 0 {
+				val := strings.TrimSpace(strings.TrimSpace(tmp[equals+1:]))
+				conf.DnsServer = val
+			}
+			if strings.HasPrefix(lineOri, "#Ipv6Priority") && equals > 0 {
+				val := strings.TrimSpace(strings.TrimSpace(tmp[equals+1:]))
+				conf.Ipv6Priority, _ = strconv.ParseBool(val)
+			}
 			continue
 		}
 		if lineLower == "[interface]" {
@@ -184,10 +197,13 @@ func FromWgQuick(s, name string) (*Config, error) {
 			parserState = inPeerSection
 			continue
 		}
+
 		if parserState == notInASection {
 			return nil, &ParseError{l18n.Sprintf("Line must occur in a section"), line}
 		}
+
 		equals := strings.IndexByte(line, '=')
+
 		if equals < 0 {
 			return nil, &ParseError{l18n.Sprintf("Config key is missing an equals separator"), line}
 		}
